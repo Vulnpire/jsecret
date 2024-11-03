@@ -1,3 +1,3 @@
-module github.com/raoufmaklouf/jsecret
+module github.com/Vulnpire/jsecret
 
-go 1.18
+go 1.22
