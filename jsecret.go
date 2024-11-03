@@ -2,30 +2,33 @@ package main
 
 import (
 	"bufio"
+	"fmt"
+	"log"
 	"os"
 	"sync"
+	"time"
 )
 
 var HashList = []string{}
+var maxConcurrentRequests = 5
+var wg sync.WaitGroup
 
 func main() {
-	var wg sync.WaitGroup
+	semaphore := make(chan struct{}, maxConcurrentRequests)
 	scanner := bufio.NewScanner(os.Stdin)
 
 	for scanner.Scan() {
-
 		line := scanner.Text()
-		if isUrl(line) == true {
+		if isUrl(line) {
 			wg.Add(1)
-			go func() {
+			go func(url string) {
 				defer wg.Done()
-				matcher(line)
-			}()
-
+				semaphore <- struct{}{}
+				defer func() { <-semaphore }()
+				matcher(url)
+			}(line)
 		}
-
 	}
 
 	wg.Wait()
-
 }
