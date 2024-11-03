@@ -8,44 +8,40 @@ import (
         "net/http"
         "regexp"
         "strings"
+        "sync"
 )
+
+var mu sync.Mutex // Mutex to control access to shared resources
 
 func matcher(url string) {
         response := requester(url)
         if response != "" {
                 Hach, _ := CreatHashSum(response)
-                if contains(HashList, Hach) == false {
+                mu.Lock() // Ensure thread-safe access to HashList
+                if !contains(HashList, Hach) {
                         HashList = append(HashList, Hach)
+                        mu.Unlock() // Release the lock before printing
                         for k, p := range regex {
                                 rgx := regexp.MustCompile(p)
-                                found := rgx.MatchString(response)
-                                if found {
+                                if rgx.MatchString(response) {
                                         mt := rgx.FindStringSubmatch(response)
                                         a := mt[0]
                                         fmt.Printf("%s  \033[32m  %s : %s \033[00m\n", url, k, a)
                                 }
-
                         }
-
+                } else {
+                        mu.Unlock() // Release the lock if hash exists
                 }
-
         }
-
 }
 
 func CreatHashSum(input string) (string, error) {
         hasher := md5.New()
-
         _, err := hasher.Write([]byte(input))
         if err != nil {
                 return "", err
         }
-
-        hashSum := hasher.Sum(nil)
-
-        hashString := hex.EncodeToString(hashSum)
-
-        return hashString, nil
+        return hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
 func contains(s []string, str string) bool {
@@ -54,37 +50,31 @@ func contains(s []string, str string) bool {
                         return true
                 }
         }
-
         return false
 }
 
 func isUrl(url string) bool {
-        s := false
-
-        if strings.HasPrefix(url, "http://") == true || strings.HasPrefix(url, "https://") == true {
-                if len(strings.Split(url, "/")) > 2 {
-                        s = true
-                }
-
-        }
-        return s
+        return strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://")
 }
-func requester(url string) string {
 
-        response := ""
+func requester(url string) string {
         client := &http.Client{}
         req, err := http.NewRequest("GET", url, nil)
-        if err == nil {
-                resp, err := client.Do(req)
-                if err == nil {
-                        defer resp.Body.Close()
-
-                        body, _ := ioutil.ReadAll(resp.Body)
-                        response = string(body)
-
-                }
+        if err != nil {
+                return ""
         }
-        return response
+
+        resp, err := client.Do(req)
+        if err != nil || resp.StatusCode != http.StatusOK {
+                return ""
+        }
+        defer resp.Body.Close()
+
+        body, err := ioutil.ReadAll(resp.Body)
+        if err != nil {
+                return ""
+        }
+        return string(body)
 }
 
 var regex = map[string]string{
