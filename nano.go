@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"crypto/md5"
 	"encoding/hex"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"net/http"
