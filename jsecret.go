@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"os"
 	"sync"
 )
@@ -9,23 +10,30 @@ import (
 var HashList = []string{}
 
 func main() {
+	concurrency := flag.Int("c", 10, "number of concurrent threads")
+	flag.Parse()
+
 	var wg sync.WaitGroup
 	scanner := bufio.NewScanner(os.Stdin)
+	urls := make(chan string, *concurrency)
 
-	for scanner.Scan() {
-
-		line := scanner.Text()
-		if isUrl(line) == true {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				matcher(line)
-			}()
-
-		}
-
+	
+	for i := 0; i < *concurrency; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for url := range urls {
+				if isUrl(url) {
+					matcher(url)
+				}
+			}
+		}()
 	}
 
-	wg.Wait()
+	for scanner.Scan() {
+		urls <- scanner.Text()
+	}
+	close(urls)
 
+	wg.Wait()
 }
