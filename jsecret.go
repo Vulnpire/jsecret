@@ -10,34 +10,34 @@ import (
 var (
 	HashList     = []string{}
 	concurrency  int
-	regexFile    string
 )
 
+func init() {
+	flag.IntVar(&concurrency, "c", 10, "Concurrency level (number of goroutines)")
+}
+
 func main() {
-	flag.IntVar(&concurrency, "c", 10, "Set the level of concurrency")
-	flag.StringVar(&regexFile, "i", "", "Path to regex file")
 	flag.Parse()
-
-	// Load regex patterns from file
-	loadRegexFromFile(regexFile)
-
 	var wg sync.WaitGroup
-	sem := make(chan struct{}, concurrency)
 	scanner := bufio.NewScanner(os.Stdin)
+
+	// Create a buffered channel to limit the number of concurrent goroutines
+	semaphore := make(chan struct{}, concurrency)
 
 	for scanner.Scan() {
 		line := scanner.Text()
 		if isUrl(line) {
 			wg.Add(1)
-			sem <- struct{}{} // Block if concurrency limit is reached
+			// Acquire a slot in the semaphore
+			semaphore <- struct{}{}
 			go func(url string) {
 				defer wg.Done()
-				defer func() { <-sem }()
 				matcher(url)
+				// Release the slot after the goroutine finishes
+				<-semaphore
 			}(line)
 		}
 	}
 
 	wg.Wait()
-	close(sem)
 }
