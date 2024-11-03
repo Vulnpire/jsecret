@@ -95,7 +95,7 @@ var regex = map[string]string{
 	"mailchamp_api":                 "[0-9a-f]{32}-us[0-9]{1,2}",
 	"digital_ocean_api":	         "dop_v1_[0-9a-zA-Z]{32}",
 	"picatic_api":                   "sk_live_[0-9a-z]{32}",
-	"linkedin_api": 	         "LIAPI_[0-9a-zA-Z]{32,64}"
+	"linkedin_api": 	         "LIAPI_[0-9a-zA-Z]{32,64}",
 	"google_oauth_id":               "[0-9(+-[0-9A-Za-z_]{32}.apps.googleusercontent.com",
 	"ipinfo token":                  "ipinfo.io?token=",
 	"zendesk token":	         "zop[a-f0-9]{32}",
