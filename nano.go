@@ -5,41 +5,47 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"regexp"
 	"strings"
-	"time"
 )
-
-var regex = compileRegex()
 
 func matcher(url string) {
 	response := requester(url)
 	if response != "" {
-		hash, err := createHashSum(response)
-		if err != nil {
-			log.Printf("Error creating hash: %v\n", err)
-			return
-		}
-		if !contains(HashList, hash) {
-			HashList = append(HashList, hash)
-			for k, rgx := range regex {
-				if found := rgx.MatchString(response); found {
-					match := rgx.FindStringSubmatch(response)
-					fmt.Printf("%s  \033[32m  %s : %s \033[00m\n", url, k, match[0])
+		Hach, _ := CreatHashSum(response)
+		if contains(HashList, Hach) == false {
+			HashList = append(HashList, Hach)
+			for k, p := range regex {
+				rgx := regexp.MustCompile(p)
+				found := rgx.MatchString(response)
+				if found {
+					mt := rgx.FindStringSubmatch(response)
+					a := mt[0]
+					fmt.Printf("%s  \033[32m  %s : %s \033[00m\n", url, k, a)
 				}
+
 			}
+
 		}
+
 	}
+
 }
 
-func createHashSum(input string) (string, error) {
+func CreatHashSum(input string) (string, error) {
 	hasher := md5.New()
-	if _, err := hasher.Write([]byte(input)); err != nil {
+
+	_, err := hasher.Write([]byte(input))
+	if err != nil {
 		return "", err
 	}
-	return hex.EncodeToString(hasher.Sum(nil)), nil
+
+	hashSum := hasher.Sum(nil)
+
+	hashString := hex.EncodeToString(hashSum)
+
+	return hashString, nil
 }
 
 func contains(s []string, str string) bool {
@@ -48,36 +54,37 @@ func contains(s []string, str string) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
 func isUrl(url string) bool {
-	return strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") && len(strings.Split(url, "/")) > 2
+	s := false
+
+	if strings.HasPrefix(url, "http://") == true || strings.HasPrefix(url, "https://") == true {
+		if len(strings.Split(url, "/")) > 2 {
+			s = true
+		}
+
+	}
+	return s
 }
-
 func requester(url string) string {
-	client := &http.Client{
-		Timeout: 10 * time.Second,
-	}
+
+	response := ""
+	client := &http.Client{}
 	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		log.Printf("Error creating request for URL %s: %v\n", url, err)
-		return ""
-	}
+	if err == nil {
+		resp, err := client.Do(req)
+		if err == nil {
+			defer resp.Body.Close()
 
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Printf("Error fetching URL %s: %v\n", url, err)
-		return ""
-	}
-	defer resp.Body.Close()
+			body, _ := ioutil.ReadAll(resp.Body)
+			response = string(body)
 
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Printf("Error reading response body for URL %s: %v\n", url, err)
-		return ""
+		}
 	}
-	return string(body)
+	return response
 }
 
 var regex = map[string]string{
@@ -100,7 +107,6 @@ var regex = map[string]string{
 	"google_oauth":                  "ya29\\.[0-9A-Za-z\\-_]+",
 	"amazon_aws_access_key_id":      "AKIA[0-9A-Z]{16}",
 	"amazon_mws_auth_token":         "amzn\\.mws\\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
-	//"amazonaws_url":                 "s3\\.amazonaws.com[/]+|[a-zA-Z0-9_-]*\\.s3\\.amazonaws.com",
 	"facebook_access_token":         "EAACEdEose0cBA[0-9A-Za-z]+",
 	"mailgun_api_key":               "key-[0-9a-zA-Z]{32}",
 	"twilio_api_key":                "K[0-9a-fA-F]{32}$",
