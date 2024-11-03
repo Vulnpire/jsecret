@@ -5,47 +5,41 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 )
+
+var regex = compileRegex()
 
 func matcher(url string) {
 	response := requester(url)
 	if response != "" {
-		Hach, _ := CreatHashSum(response)
-		if contains(HashList, Hach) == false {
-			HashList = append(HashList, Hach)
-			for k, p := range regex {
-				rgx := regexp.MustCompile(p)
-				found := rgx.MatchString(response)
-				if found {
-					mt := rgx.FindStringSubmatch(response)
-					a := mt[0]
-					fmt.Printf("%s  \033[32m  %s : %s \033[00m\n", url, k, a)
-				}
-
-			}
-
+		hash, err := createHashSum(response)
+		if err != nil {
+			log.Printf("Error creating hash: %v\n", err)
+			return
 		}
-
+		if !contains(HashList, hash) {
+			HashList = append(HashList, hash)
+			for k, rgx := range regex {
+				if found := rgx.MatchString(response); found {
+					match := rgx.FindStringSubmatch(response)
+					fmt.Printf("%s  \033[32m  %s : %s \033[00m\n", url, k, match[0])
+				}
+			}
+		}
 	}
-
 }
 
-func CreatHashSum(input string) (string, error) {
+func createHashSum(input string) (string, error) {
 	hasher := md5.New()
-
-	_, err := hasher.Write([]byte(input))
-	if err != nil {
+	if _, err := hasher.Write([]byte(input)); err != nil {
 		return "", err
 	}
-
-	hashSum := hasher.Sum(nil)
-
-	hashString := hex.EncodeToString(hashSum)
-
-	return hashString, nil
+	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
 func contains(s []string, str string) bool {
@@ -54,60 +48,64 @@ func contains(s []string, str string) bool {
 			return true
 		}
 	}
-
 	return false
 }
 
 func isUrl(url string) bool {
-	s := false
-
-	if strings.HasPrefix(url, "http://") == true || strings.HasPrefix(url, "https://") == true {
-		if len(strings.Split(url, "/")) > 2 {
-			s = true
-		}
-
-	}
-	return s
+	return strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") && len(strings.Split(url, "/")) > 2
 }
+
 func requester(url string) string {
-
-	response := ""
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", url, nil)
-	if err == nil {
-		resp, err := client.Do(req)
-		if err == nil {
-			defer resp.Body.Close()
-
-			body, _ := ioutil.ReadAll(resp.Body)
-			response = string(body)
-
-		}
+	client := &http.Client{
+		Timeout: 10 * time.Second,
 	}
-	return response
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		log.Printf("Error creating request for URL %s: %v\n", url, err)
+		return ""
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("Error fetching URL %s: %v\n", url, err)
+		return ""
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("Error reading response body for URL %s: %v\n", url, err)
+		return ""
+	}
+	return string(body)
 }
 
 var regex = map[string]string{
-	"TODO CRITICAL":            "TODO CRITICAL:",
-	"Yopmail":                  "@yopmail.com",
-	"Firebase":                 "[-a-zA-Z0-9@:%._~#=]{1,256}.firebaseio.com",
-	"AWS Access Key ID Value":  "(A3T[A-Z0-9]|AKIA|AGPA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}",
-	"FCM Server Key":           "AAAA[a-zA-Z0-9_-]{7}:[a-zA-Z0-9_-]{140}",
-	"slack_token":              "(xox[p|b|o|a]-[0-9]{12}-[0-9]{12}-[0-9]{12}-[a-z0-9]{32})",
-	"slack_webhook":            "https://hooks.slack.com/services/T[a-zA-Z0-9_]{8}/B[a-zA-Z0-9_]{8}/[a-zA-Z0-9_]{24}",
-	"facebook_oauth":           "[f|F][a|A][c|C][e|E][b|B][o|O][o|O][k|K].{0,30}['\"\\s][0-9a-f]{32}['\"\\s]",
-	"twitter_oauth":            "[t|T][w|W][i|I][t|T][t|T][e|E][r|R].{0,30}['\"\\s][0-9a-zA-Z]{35,44}['\"\\s]",
-	"heroku_api":               "[h|H][e|E][r|R][o|O][k|K][u|U].{0,30}[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}",
-	"mailgun_api":              "key-[0-9a-zA-Z]{32}",
-	"mailchamp_api":            "[0-9a-f]{32}-us[0-9]{1,2}",
-	"picatic_api":              "sk_live_[0-9a-z]{32}",
-	"google_oauth_id":          "[0-9(+-[0-9A-Za-z_]{32}.apps.googleusercontent.com",
-	"ipinfo token":             "ipinfo.io?token=",
-	"google_api":               "AIza[0-9A-Za-z-_]{35}",
-	"google_captcha":           "^6[0-9a-zA-Z_-]{39}$",
-	"google_oauth":             "ya29\\.[0-9A-Za-z\\-_]+",
-	"amazon_aws_access_key_id": "AKIA[0-9A-Z]{16}",
-	"amazon_mws_auth_token":    "amzn\\.mws\\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+	"TODO CRITICAL":                 "TODO CRITICAL:",
+	"Yopmail":                       "@yopmail.com",
+	"Firebase":                      "[-a-zA-Z0-9@:%._~#=]{1,256}.firebaseio.com",
+	"AWS Access Key ID Value":       "(A3T[A-Z0-9]|AKIA|AGPA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}",
+	"FCM Server Key":                "AAAA[a-zA-Z0-9_-]{7}:[a-zA-Z0-9_-]{140}",
+	"slack_token":                   "(xox[p|b|o|a]-[0-9]{12}-[0-9]{12}-[0-9]{12}-[a-z0-9]{32})",
+	"slack_webhook":                 "https://hooks.slack.com/services/T[a-zA-Z0-9_]{8}/B[a-zA-Z0-9_]{8}/[a-zA-Z0-9_]{24}",
+	"facebook_oauth":                "[f|F][a|A][c|C][e|E][b|B][o|O][o|O][k|K].{0,30}['\"\\s][0-9a-f]{32}['\"\\s]",
+	"twitter_oauth":                 "[t|T][w|W][i|I][t|T][t|T][e|E][r|R].{0,30}['\"\\s][0-9a-zA-Z]{35,44}['\"\\s]",
+	"heroku_api":                    "[h|H][e|E][r|R][o|O][k|K][u|U].{0,30}[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}",
+	"mailgun_api":                   "key-[0-9a-zA-Z]{32}",
+	"mailchamp_api":                 "[0-9a-f]{32}-us[0-9]{1,2}",
+	"digital_ocean_api":	         "dop_v1_[0-9a-zA-Z]{32}",
+	"picatic_api":                   "sk_live_[0-9a-z]{32}",
+	"linkedin_api": 	         "LIAPI_[0-9a-zA-Z]{32,64}"
+	"google_oauth_id":               "[0-9(+-[0-9A-Za-z_]{32}.apps.googleusercontent.com",
+	"ipinfo token":                  "ipinfo.io?token=",
+	"zendesk token":	         "zop[a-f0-9]{32}",
+	"google_api":                    "AIza[0-9A-Za-z-_]{35}",
+	"google_captcha":                "^6[0-9a-zA-Z_-]{39}$",
+	"jwt_token":		         "eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+",
+	"redis_c_string":                "redis://:[a-f0-9]{32}@.*:[0-9]{4,5}",
+	"google_oauth":                  "ya29\\.[0-9A-Za-z\\-_]+",
+	"amazon_aws_access_key_id":      "AKIA[0-9A-Z]{16}",
+	"amazon_mws_auth_token":         "amzn\\.mws\\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
 	//"amazonaws_url":                 "s3\\.amazonaws.com[/]+|[a-zA-Z0-9_-]*\\.s3\\.amazonaws.com",
 	"facebook_access_token":         "EAACEdEose0cBA[0-9A-Za-z]+",
 	"mailgun_api_key":               "key-[0-9a-zA-Z]{32}",
@@ -181,18 +179,6 @@ var regex = map[string]string{
 	"credentials-disclosure[158]":   "sendgrid(=| =|:| :)",
 	"credentials-disclosure[159]":   "selion[_-]?selenium[_-]?host(=| =|:| :)",
 	"credentials-disclosure[160]":   "selion[_-]?log[_-]?level[_-]?dev(=| =|:| :)",
-	"credentials-disclosure[165]":   "secret[_-]?9(=| =|:| :)",
-	"credentials-disclosure[166]":   "secret[_-]?8(=| =|:| :)",
-	"credentials-disclosure[167]":   "secret[_-]?7(=| =|:| :)",
-	"credentials-disclosure[168]":   "secret[_-]?6(=| =|:| :)",
-	"credentials-disclosure[169]":   "secret[_-]?5(=| =|:| :)",
-	"credentials-disclosure[170]":   "secret[_-]?4(=| =|:| :)",
-	"credentials-disclosure[171]":   "secret[_-]?3(=| =|:| :)",
-	"credentials-disclosure[172]":   "secret[_-]?2(=| =|:| :)",
-	"credentials-disclosure[173]":   "secret[_-]?11(=| =|:| :)",
-	"credentials-disclosure[174]":   "secret[_-]?10(=| =|:| :)",
-	"credentials-disclosure[175]":   "secret[_-]?1(=| =|:| :)",
-	"credentials-disclosure[176]":   "secret[_-]?0(=| =|:| :)",
 	"credentials-disclosure[185]":   "sacloud[_-]?api(=| =|:| :)",
 	"credentials-disclosure[188]":   "s3[_-]?user[_-]?secret(=| =|:| :)",
 	"credentials-disclosure[190]":   "s3[_-]?secret[_-]?assets(=| =|:| :)",
@@ -353,11 +339,4 @@ var regex = map[string]string{
 	"credentials-disclosure[662]":   "api[_-]?secret(=| =|:| :)",
 	"credentials-disclosure[666]":   "aos[_-]?sec(=| =|:| :)",
 	"credentials-disclosure[672]":   "amazon[_-]?bucket[_-]?name(=| =|:| :)",
-
-	"credentials-disclosure[690]": `\b\w*[sS][eE][cC][rR][eE][tT]\b(=| =|:| :)\s*([\w\d\-@+"']{8,})`,
-	"credentials-disclosure[693]": `\b\w*[tT][oO][kK][eE][nN]\b(=| =|:| :)\s*([\w\d\-@+"']{8,})`,
-	"credentials-disclosure[694]": `\b\w*[pP][aA][sS][sS]\b(=| =|:| :)\s*([\w\d\-@+"']{8,})`,
-	"credentials-disclosure[695]": `\b\w*[kK][eE][yY]\b(=| =|:| :)\s*([\w\d\-@+"']{8,})`,
-	"credentials-disclosure[696]": `\b\w*[pP][aA][sS][sS][wW][oO][rR][dD]\b(=| =|:| :)\s*([\w\d\-@+"']{8,})`,
-	"credentials-disclosure[697]": `\b\w*[eE][mM][aA][iI][lL]\b(=| =|:| :)\s*([\w\d\-@+"']{8,})`,
 }
