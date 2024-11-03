@@ -2,11 +2,11 @@ package main
 
 import (
 	"bufio"
-	"fmt"
-	"log"
+//	"fmt"
+//	"log"
 	"os"
 	"sync"
-	"time"
+//	"time"
 )
 
 var HashList = []string{}
