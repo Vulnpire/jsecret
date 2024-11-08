@@ -128,7 +128,7 @@ var regex = map[string]string{
         "email":                         "(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+.[a-zA-Z0-9-.]+$)",
         "api.runtime.dev":               "https://api.runtime.dev/tlp?apikey",
         "app.sportdataapi.com":          "https://app.sportdataapi.com/api",
-        "jiira_token":                   "/ATATT3[a-zA-Z0-9_\-+=]{184,195}$/",
+        "jira_token":                   "/ATATT3[a-zA-Z0-9_\\-+=]{184,195}$/",
         "api.mediastack.com":            "https://api.mediastack.com/v1",
         "api.screenshotlayer.com":       "http://api.screenshotlayer.com/api/capture ",
         "api.languagelayer.com":         "http://api.languagelayer.com/detect?access_key=",
